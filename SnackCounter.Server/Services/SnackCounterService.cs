@@ -7,6 +7,7 @@ namespace SnackCounter.Server.Services;
 public sealed class SnackCounterService : IReplenishmentService
 {
     private readonly ConcurrentDictionary<Guid, SnackTicket> _tickets = new();
+    private readonly ConcurrentDictionary<Guid, ReimbursementClaim> _claims = new();
     private readonly ConcurrentDictionary<string, int> _volunteerOpenTickets = new();
     private readonly Dictionary<string, decimal> _monthlyReserved = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, decimal> _monthlySpent = new(StringComparer.OrdinalIgnoreCase);
@@ -21,6 +22,9 @@ public sealed class SnackCounterService : IReplenishmentService
 
     public IReadOnlyCollection<SnackTicket> GetTickets() =>
         _tickets.Values.OrderByDescending(ticket => ticket.CreatedAt).ToArray();
+
+    public ReimbursementClaim? GetClaim(Guid ticketId) =>
+        _claims.TryGetValue(ticketId, out var claim) ? claim : null;
 
     public (SnackTicket? Ticket, string? Error) ReportContainer(ReportContainerRequest request)
     {
@@ -129,6 +133,15 @@ public sealed class SnackCounterService : IReplenishmentService
             var budgetKey = GetBudgetKey(ticket.OfficeId, ticket.CreatedAt);
             _monthlyReserved[budgetKey] = Math.Max(0, _monthlyReserved.GetValueOrDefault(budgetKey) - ticket.ReservedBudget);
             _monthlySpent[budgetKey] = _monthlySpent.GetValueOrDefault(budgetKey) + request.Amount;
+            _claims[ticketId] = new ReimbursementClaim(
+                Guid.NewGuid(),
+                ticketId,
+                $"SNACK-{ticketId:N}",
+                request.VolunteerId.Trim(),
+                request.Amount,
+                ticket.Currency,
+                ClaimStatus.Submitted,
+                DateTimeOffset.UtcNow);
             _volunteerOpenTickets.AddOrUpdate(request.VolunteerId, 0, (_, value) => Math.Max(0, value - 1));
             return (submitted, null);
         }

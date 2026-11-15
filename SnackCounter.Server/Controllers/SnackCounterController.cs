@@ -50,4 +50,11 @@ public sealed class SnackCounterController(IReplenishmentService service) : Cont
     [HttpGet("reports/monthly")]
     public IActionResult MonthlyReport([FromQuery] DateOnly? month = null) =>
         Ok(service.GetMonthlyReport(month ?? DateOnly.FromDateTime(DateTime.UtcNow)));
+
+    [HttpGet("tickets/{ticketId:guid}/claim")]
+    public IActionResult Claim(Guid ticketId)
+    {
+        var claim = service.GetClaim(ticketId);
+        return claim is null ? NotFound(new { error = "Claim not found." }) : Ok(claim);
+    }
 }
