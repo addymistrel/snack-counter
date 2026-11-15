@@ -1,20 +1,29 @@
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 using SnackCounter.Server.Application;
 using SnackCounter.Server.Models;
 
 namespace SnackCounter.Server.Controllers;
 
 [ApiController]
-[Route("api/snack-counter")]
+[ApiVersion(1.0)]
+[Route("api/v{version:apiVersion}/snack-counter")]
 public sealed class SnackCounterController(IReplenishmentService service) : ControllerBase
 {
     [HttpGet("dashboard")]
-    public IActionResult Dashboard() => Ok(new { offices = service.Offices, tickets = service.GetTickets() });
+    public async Task<IActionResult> Dashboard(CancellationToken cancellationToken) =>
+        Ok(new
+        {
+            offices = await service.GetOfficesAsync(cancellationToken),
+            tickets = await service.GetTicketsAsync(cancellationToken)
+        });
 
     [HttpPost("containers/report")]
-    public IActionResult ReportContainer(ReportContainerRequest request)
+    public async Task<IActionResult> ReportContainer(
+        ReportContainerRequest request,
+        CancellationToken cancellationToken)
     {
-        var result = service.ReportContainer(request);
+        var result = await service.ReportContainerAsync(request, cancellationToken);
         if (result.Error is null)
             return Ok(result.Ticket);
         return result.Ticket is not null
@@ -23,9 +32,12 @@ public sealed class SnackCounterController(IReplenishmentService service) : Cont
     }
 
     [HttpPost("tickets/{ticketId:guid}/acknowledge")]
-    public IActionResult Acknowledge(Guid ticketId, AcknowledgeRequest request)
+    public async Task<IActionResult> Acknowledge(
+        Guid ticketId,
+        AcknowledgeRequest request,
+        CancellationToken cancellationToken)
     {
-        var result = service.Acknowledge(ticketId, request);
+        var result = await service.AcknowledgeAsync(ticketId, request, cancellationToken);
         if (result.Error is null)
             return Ok(result.Ticket);
         return result.Error is "This ticket is no longer available."
@@ -37,9 +49,12 @@ public sealed class SnackCounterController(IReplenishmentService service) : Cont
     }
 
     [HttpPost("tickets/{ticketId:guid}/proof")]
-    public IActionResult SubmitProof(Guid ticketId, ProofRequest request)
+    public async Task<IActionResult> SubmitProof(
+        Guid ticketId,
+        ProofRequest request,
+        CancellationToken cancellationToken)
     {
-        var result = service.SubmitProof(ticketId, request);
+        var result = await service.SubmitProofAsync(ticketId, request, cancellationToken);
         if (result.Error is null)
             return Ok(result.Ticket);
         return result.Error is "Only the assigned volunteer can submit proof for an acknowledged ticket."
@@ -48,13 +63,17 @@ public sealed class SnackCounterController(IReplenishmentService service) : Cont
     }
 
     [HttpGet("reports/monthly")]
-    public IActionResult MonthlyReport([FromQuery] DateOnly? month = null) =>
-        Ok(service.GetMonthlyReport(month ?? DateOnly.FromDateTime(DateTime.UtcNow)));
+    public async Task<IActionResult> MonthlyReport(
+        [FromQuery] DateOnly? month = null,
+        CancellationToken cancellationToken = default) =>
+        Ok(await service.GetMonthlyReportAsync(
+            month ?? DateOnly.FromDateTime(DateTime.UtcNow),
+            cancellationToken));
 
     [HttpGet("tickets/{ticketId:guid}/claim")]
-    public IActionResult Claim(Guid ticketId)
+    public async Task<IActionResult> Claim(Guid ticketId, CancellationToken cancellationToken)
     {
-        var claim = service.GetClaim(ticketId);
+        var claim = await service.GetClaimAsync(ticketId, cancellationToken);
         return claim is null ? NotFound(new { error = "Claim not found." }) : Ok(claim);
     }
 }

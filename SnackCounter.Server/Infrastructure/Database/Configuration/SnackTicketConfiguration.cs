@@ -21,6 +21,10 @@ public sealed class SnackTicketConfiguration : IEntityTypeConfiguration<SnackTic
         builder.Property(ticket => ticket.Status).HasMaxLength(32).IsRequired();
         builder.Property(ticket => ticket.ReservedBudget).HasPrecision(18, 2);
         builder.Property(ticket => ticket.SpentAmount).HasPrecision(18, 2);
+        builder.Property(ticket => ticket.ItemsJson)
+            .HasColumnType("jsonb")
+            .HasDefaultValueSql("'[]'::jsonb")
+            .IsRequired();
         builder.HasOne(ticket => ticket.Office)
             .WithMany(office => office.Tickets)
             .HasForeignKey(ticket => ticket.OfficeId)

@@ -6,7 +6,12 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 
 builder.Services.AddControllers();
-builder.Services.AddSingleton<SnackCounter.Server.Services.SnackCounterService>();
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new Asp.Versioning.ApiVersion(1.0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+});
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? builder.Configuration["DATABASE_URL"];
 if (!string.IsNullOrWhiteSpace(connectionString))
@@ -14,6 +19,10 @@ if (!string.IsNullOrWhiteSpace(connectionString))
     builder.Services.AddDbContext<SnackCounterDbContext>(options =>
         options.UseNpgsql(DatabaseConnectionString.Normalize(connectionString)));
 }
+builder.Services.AddScoped<SnackCounter.Server.Application.IReplenishmentRepository,
+    SnackCounter.Server.Repositories.EfReplenishmentRepository>();
+builder.Services.AddScoped<SnackCounter.Server.Application.IReplenishmentService,
+    SnackCounter.Server.Services.SnackCounterService>();
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("postgresql");
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

@@ -16,4 +16,6 @@ public sealed class SnackTicketEntity
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset AcknowledgementDeadline { get; set; }
     public decimal? SpentAmount { get; set; }
+    public string ItemsJson { get; set; } = "[]";
+    public bool ProofExceedsEstimate { get; set; }
 }
