@@ -27,6 +27,8 @@ public sealed class SnackCounterService : IReplenishmentService
 
         if (!_offices.TryGetValue(request.OfficeId, out var office))
             return (null, "Choose a supported office.");
+        if (request.Quantity <= 0 || request.UnitPrice <= 0 || string.IsNullOrWhiteSpace(request.SnackName))
+            return (null, "Snack name, quantity, and unit price must be positive.");
 
         lock (_stateGate)
         {
@@ -40,17 +42,20 @@ public sealed class SnackCounterService : IReplenishmentService
             var reserved = _tickets.Values
                 .Where(ticket => ticket.OfficeId == office.Id && ticket.CreatedAt >= monthStart && ticket.Status != TicketStatus.Closed)
                 .Sum(ticket => ticket.ReservedBudget);
-            const decimal defaultReservation = 500m;
-            if (reserved + defaultReservation > office.MonthlyBudget)
+            var estimatedCost = request.Quantity * request.UnitPrice;
+            if (reserved + estimatedCost > office.MonthlyBudget)
                 return (null, $"The {office.Name} monthly budget has no room for another reservation.");
 
             var ticket = new SnackTicket(
                 Guid.NewGuid(),
                 request.ContainerId.Trim(),
+                request.SnackName.Trim(),
+                request.Quantity,
+                request.UnitPrice,
                 office.Id,
                 office.Name,
                 office.Currency,
-                defaultReservation,
+                estimatedCost,
                 TicketStatus.Open,
                 null,
                 DateTimeOffset.UtcNow,

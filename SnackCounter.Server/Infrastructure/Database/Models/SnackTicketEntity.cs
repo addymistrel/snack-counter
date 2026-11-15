@@ -4,6 +4,9 @@ public sealed class SnackTicketEntity
 {
     public Guid Id { get; set; }
     public string ContainerId { get; set; } = string.Empty;
+    public string SnackName { get; set; } = string.Empty;
+    public int Quantity { get; set; }
+    public decimal UnitPrice { get; set; }
     public string OfficeId { get; set; } = string.Empty;
     public OfficeEntity Office { get; set; } = null!;
     public string Currency { get; set; } = string.Empty;

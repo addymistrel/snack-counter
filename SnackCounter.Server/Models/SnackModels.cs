@@ -18,6 +18,9 @@ public sealed record Office(
 public sealed record SnackTicket(
     Guid Id,
     string ContainerId,
+    string SnackName,
+    int Quantity,
+    decimal UnitPrice,
     string OfficeId,
     string OfficeName,
     string Currency,
@@ -34,7 +37,10 @@ public sealed record ReportContainerRequest(
     string OfficeId,
     bool ContainerEmpty,
     bool LocationConfirmed,
-    bool SnackTypeConfirmed);
+    bool SnackTypeConfirmed,
+    string SnackName = "Assorted snacks",
+    int Quantity = 5,
+    decimal UnitPrice = 100m);
 
 public sealed record AcknowledgeRequest(string VolunteerId, bool ReimbursementConsent);
 

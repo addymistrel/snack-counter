@@ -15,6 +15,8 @@ public sealed class SnackTicketConfiguration : IEntityTypeConfiguration<SnackTic
             .IsUnique()
             .HasFilter("\"Status\" IN ('Open', 'Acknowledged')");
         builder.Property(ticket => ticket.ContainerId).HasMaxLength(100).IsRequired();
+        builder.Property(ticket => ticket.SnackName).HasMaxLength(100).IsRequired();
+        builder.Property(ticket => ticket.UnitPrice).HasPrecision(18, 2);
         builder.Property(ticket => ticket.Currency).HasMaxLength(3).IsRequired();
         builder.Property(ticket => ticket.Status).HasMaxLength(32).IsRequired();
         builder.Property(ticket => ticket.ReservedBudget).HasPrecision(18, 2);
