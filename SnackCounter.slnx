@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="snackcounter.client/snackcounter.client.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+  <Project Path="SnackCounter.Server/SnackCounter.Server.csproj" />
+</Solution>

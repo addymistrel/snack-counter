@@ -1,0 +1,6 @@
+@SnackCounter.Server_HostAddress = http://localhost:5212
+
+GET {{SnackCounter.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
