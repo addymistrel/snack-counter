@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/*.user
+**/packages/
+**/vs/
+**/Storage/
+enums.js
+dbdesign.txt
+FoodCourtMangementV1.txt
+**/WebApp/
+**/Logs/
+final.md
+# Generated embedded secret for connection string decryption
+**/EmbeddedSecret.g.cs
