@@ -10,6 +10,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Tests\**" />
+    <EmbeddedResource Remove="Tests\**" />
+    <Content Remove="Tests\**" />
+    <None Remove="Tests\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Asp.Versioning.Mvc" Version="8.*" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy">
       <Version>8.*-*</Version>
     </PackageReference>

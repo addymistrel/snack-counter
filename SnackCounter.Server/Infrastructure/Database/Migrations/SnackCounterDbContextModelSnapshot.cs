@@ -80,6 +80,69 @@ namespace SnackCounter.Server.Infrastructure.Database.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Offices");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "oslo",
+                            Currency = "NOK",
+                            MonthlyBudget = 6000m,
+                            Name = "Oslo"
+                        },
+                        new
+                        {
+                            Id = "bengaluru",
+                            Currency = "INR",
+                            MonthlyBudget = 15000m,
+                            Name = "Bengaluru"
+                        });
+                });
+
+            modelBuilder.Entity("SnackCounter.Server.Infrastructure.Database.Models.ReimbursementClaimEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<string>("ReferenceId")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("TicketId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VolunteerId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReferenceId")
+                        .IsUnique();
+
+                    b.HasIndex("TicketId")
+                        .IsUnique();
+
+                    b.ToTable("ReimbursementClaims");
                 });
 
             modelBuilder.Entity("SnackCounter.Server.Infrastructure.Database.Models.SnackTicketEntity", b =>
@@ -104,9 +167,18 @@ namespace SnackCounter.Server.Infrastructure.Database.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)");
 
+                    b.Property<string>("ItemsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
                     b.Property<string>("OfficeId")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<bool>("ProofExceedsEstimate")
+                        .HasColumnType("boolean");
 
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
@@ -159,6 +231,17 @@ namespace SnackCounter.Server.Infrastructure.Database.Migrations
                         .IsRequired();
 
                     b.Navigation("Office");
+                });
+
+            modelBuilder.Entity("SnackCounter.Server.Infrastructure.Database.Models.ReimbursementClaimEntity", b =>
+                {
+                    b.HasOne("SnackCounter.Server.Infrastructure.Database.Models.SnackTicketEntity", "Ticket")
+                        .WithMany()
+                        .HasForeignKey("TicketId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Ticket");
                 });
 
             modelBuilder.Entity("SnackCounter.Server.Infrastructure.Database.Models.SnackTicketEntity", b =>

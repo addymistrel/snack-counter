@@ -70,16 +70,16 @@ function App() {
     );
 
     async function refresh() {
-        const response = await fetch('/api/snack-counter/dashboard');
+        const response = await fetch('/api/v1/snack-counter/dashboard');
         if (response.ok) setDashboard(await response.json() as Dashboard);
-        const reportResponse = await fetch('/api/snack-counter/reports/monthly');
+        const reportResponse = await fetch('/api/v1/snack-counter/reports/monthly');
         if (reportResponse.ok) setMonthlyReport(await reportResponse.json() as MonthlyReport);
     }
 
     async function reportContainer(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         setIsSubmitting(true);
-        const response = await fetch('/api/snack-counter/containers/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ containerId, officeId, containerEmpty: true, locationConfirmed: true, snackTypeConfirmed: true }) });
+        const response = await fetch('/api/v1/snack-counter/containers/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ containerId, officeId, containerEmpty: true, locationConfirmed: true, snackTypeConfirmed: true }) });
         const result = await response.json() as { error?: string };
         setNotice(response.ok ? 'Ticket created. Volunteers have been notified.' : result.error ?? 'Unable to create ticket.');
         if (response.ok) setContainerId('');
@@ -88,7 +88,7 @@ function App() {
     }
 
     async function acknowledge(ticketId: string) {
-        const response = await fetch(`/api/snack-counter/tickets/${ticketId}/acknowledge`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ volunteerId, reimbursementConsent: true }) });
+        const response = await fetch(`/api/v1/snack-counter/tickets/${ticketId}/acknowledge`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ volunteerId, reimbursementConsent: true }) });
         const result = await response.json() as { error?: string };
         setNotice(response.ok ? 'Ticket acknowledged. Submit proof after shopping.' : result.error ?? 'Unable to acknowledge ticket.');
         await refresh();
@@ -96,10 +96,10 @@ function App() {
 
     async function submitProof(event: FormEvent<HTMLFormElement>, ticketId: string) {
         event.preventDefault();
-        const response = await fetch(`/api/snack-counter/tickets/${ticketId}/proof`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ volunteerId, amount: Number(proofAmount), items: proofItems.split(','), receiptFileName: proofReceipt, counterPhotoFileName: proofPhoto }) });
+        const response = await fetch(`/api/v1/snack-counter/tickets/${ticketId}/proof`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ volunteerId, amount: Number(proofAmount), items: proofItems.split(','), receiptFileName: proofReceipt, counterPhotoFileName: proofPhoto }) });
         const result = await response.json() as { error?: string; id?: string };
         if (response.ok) {
-            const claimResponse = await fetch(`/api/snack-counter/tickets/${ticketId}/claim`);
+            const claimResponse = await fetch(`/api/v1/snack-counter/tickets/${ticketId}/claim`);
             if (claimResponse.ok) setClaim(await claimResponse.json() as Claim);
             setNotice('Proof submitted. Your simulated reimbursement claim is ready.');
             setProofAmount('');
