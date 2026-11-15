@@ -74,6 +74,7 @@ public sealed class SnackCounterService : IReplenishmentService
         if (string.IsNullOrWhiteSpace(request.VolunteerId))
             return (null, "Volunteer ID is required.");
 
+        var volunteerId = request.VolunteerId.Trim();
         lock (_stateGate)
         {
             if (!_tickets.TryGetValue(ticketId, out var ticket))
@@ -82,7 +83,7 @@ public sealed class SnackCounterService : IReplenishmentService
                 return (null, "This ticket is no longer available.");
             if (ticket.AcknowledgementDeadline <= DateTimeOffset.UtcNow)
                 return (null, "The acknowledgement window has expired.");
-            var openCount = _volunteerOpenTickets.GetValueOrDefault(request.VolunteerId);
+            var openCount = _volunteerOpenTickets.GetValueOrDefault(volunteerId);
             if (openCount >= 2)
                 return (null, "Volunteers can have at most two open tickets.");
             if (openCount >= 1 && !request.ReimbursementConsent)
@@ -91,10 +92,10 @@ public sealed class SnackCounterService : IReplenishmentService
             var acknowledged = ticket with
             {
                 Status = TicketStatus.Acknowledged,
-                VolunteerId = request.VolunteerId.Trim()
+                VolunteerId = volunteerId
             };
             _tickets[ticketId] = acknowledged;
-            _volunteerOpenTickets.AddOrUpdate(request.VolunteerId, 1, (_, value) => value + 1);
+            _volunteerOpenTickets[volunteerId] = openCount + 1;
             return (acknowledged, null);
         }
     }

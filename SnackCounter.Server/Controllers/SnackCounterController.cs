@@ -15,14 +15,25 @@ public sealed class SnackCounterController(IReplenishmentService service) : Cont
     public IActionResult ReportContainer(ReportContainerRequest request)
     {
         var result = service.ReportContainer(request);
-        return result.Error is null ? Ok(result.Ticket) : BadRequest(new { error = result.Error, ticket = result.Ticket });
+        if (result.Error is null)
+            return Ok(result.Ticket);
+        return result.Ticket is not null
+            ? Conflict(new { error = result.Error, ticket = result.Ticket })
+            : BadRequest(new { error = result.Error });
     }
 
     [HttpPost("tickets/{ticketId:guid}/acknowledge")]
     public IActionResult Acknowledge(Guid ticketId, AcknowledgeRequest request)
     {
         var result = service.Acknowledge(ticketId, request);
-        return result.Error is null ? Ok(result.Ticket) : BadRequest(new { error = result.Error });
+        if (result.Error is null)
+            return Ok(result.Ticket);
+        return result.Error is "This ticket is no longer available."
+            or "The acknowledgement window has expired."
+            or "Volunteers can have at most two open tickets."
+            or "Reimbursement consent is required when you have two or more unpaid claims."
+            ? Conflict(new { error = result.Error })
+            : BadRequest(new { error = result.Error });
     }
 
     [HttpPost("tickets/{ticketId:guid}/proof")]
