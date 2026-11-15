@@ -10,6 +10,10 @@ public sealed class SnackTicketConfiguration : IEntityTypeConfiguration<SnackTic
     {
         builder.HasKey(ticket => ticket.Id);
         builder.HasIndex(ticket => new { ticket.ContainerId, ticket.Status });
+        builder.HasIndex(ticket => ticket.ContainerId)
+            .HasDatabaseName("ux_tickets_active_container")
+            .IsUnique()
+            .HasFilter("\"Status\" IN ('Open', 'Acknowledged')");
         builder.Property(ticket => ticket.ContainerId).HasMaxLength(100).IsRequired();
         builder.Property(ticket => ticket.Currency).HasMaxLength(3).IsRequired();
         builder.Property(ticket => ticket.Status).HasMaxLength(32).IsRequired();

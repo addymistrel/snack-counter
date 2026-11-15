@@ -90,6 +90,11 @@ namespace SnackCounter.Server.Infrastructure.Database.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ContainerId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tickets_active_container")
+                        .HasFilter("\"Status\" IN ('Open', 'Acknowledged')");
+
                     b.HasIndex("OfficeId");
 
                     b.HasIndex("ContainerId", "Status");
