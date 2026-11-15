@@ -30,7 +30,8 @@ public sealed record SnackTicket(
     DateTimeOffset CreatedAt,
     DateTimeOffset AcknowledgementDeadline,
     decimal? SpentAmount,
-    IReadOnlyList<string> Items);
+    IReadOnlyList<string> Items,
+    bool ProofExceedsEstimate = false);
 
 public sealed record ReportContainerRequest(
     string ContainerId,
