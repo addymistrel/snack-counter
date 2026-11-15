@@ -22,6 +22,42 @@ namespace SnackCounter.Server.Infrastructure.Database.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("SnackCounter.Server.Infrastructure.Database.Models.OfficeBudgetPeriodEntity", b =>
+                {
+                    b.Property<string>("OfficeId")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<decimal>("LimitAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("Reserved")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("Spent")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("OfficeId", "Year", "Month");
+
+                    b.ToTable("OfficeBudgetPeriods", t =>
+                        {
+                            t.HasCheckConstraint("ck_budget_period_month", "\"Month\" BETWEEN 1 AND 12");
+                        });
+                });
+
             modelBuilder.Entity("SnackCounter.Server.Infrastructure.Database.Models.OfficeEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -112,6 +148,17 @@ namespace SnackCounter.Server.Infrastructure.Database.Migrations
                     b.HasIndex("ContainerId", "Status");
 
                     b.ToTable("SnackTickets");
+                });
+
+            modelBuilder.Entity("SnackCounter.Server.Infrastructure.Database.Models.OfficeBudgetPeriodEntity", b =>
+                {
+                    b.HasOne("SnackCounter.Server.Infrastructure.Database.Models.OfficeEntity", "Office")
+                        .WithMany()
+                        .HasForeignKey("OfficeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Office");
                 });
 
             modelBuilder.Entity("SnackCounter.Server.Infrastructure.Database.Models.SnackTicketEntity", b =>
