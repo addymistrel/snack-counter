@@ -5,9 +5,12 @@ import './App.css';
 interface Office { id: string; name: string; currency: string; monthlyBudget: number; }
 interface Ticket { id: string; containerId: string; officeName: string; currency: string; status: string; reservedBudget: number; spentAmount?: number; }
 interface Dashboard { offices: Office[]; tickets: Ticket[]; }
+interface SnackSummary { name: string; quantity: number; spend: number; currency: string; }
+interface MonthlyReport { month: string; consolidatedNokTotal: number; topSnacks: SnackSummary[]; }
 
 function App() {
     const [dashboard, setDashboard] = useState<Dashboard>();
+    const [monthlyReport, setMonthlyReport] = useState<MonthlyReport>();
     const [containerId, setContainerId] = useState(getQrContainerId);
     const [officeId, setOfficeId] = useState('oslo');
     const [volunteerId, setVolunteerId] = useState('volunteer-1');
@@ -43,6 +46,10 @@ function App() {
             <section className="card table-card">
                 <div className="card-heading"><span className="step">03</span><div><h2>Monthly control room</h2><p>Native currency budgets with a single NOK view for management.</p></div><button className="secondary" onClick={() => void refresh()}>Refresh</button></div>
                 <div className="office-grid">{dashboard?.offices.map(office => { const tickets = dashboard.tickets.filter(ticket => ticket.officeName === office.name); const spent = tickets.reduce((sum, ticket) => sum + (ticket.spentAmount ?? 0), 0); return <div className="office" key={office.id}><span>{office.name}</span><strong>{spent.toLocaleString()} {office.currency}</strong><small>{tickets.length} tickets · budget {office.monthlyBudget.toLocaleString()}</small><div className="bar"><i style={{ width: `${Math.min(100, (spent / office.monthlyBudget) * 100)}%` }} /></div></div>; })}</div>
+                <div className="report-summary">
+                    <div><span>Consolidated NOK</span><strong>{monthlyReport?.consolidatedNokTotal.toLocaleString() ?? '0'} NOK</strong><small>{monthlyReport?.month ?? 'Current month'} · sample rate</small></div>
+                    <div><span>Top snacks</span>{monthlyReport?.topSnacks.length ? monthlyReport.topSnacks.map(snack => <small key={`${snack.name}-${snack.currency}`}>{snack.name} · {snack.quantity} · {snack.spend.toLocaleString()} {snack.currency}</small>) : <small>No purchases yet.</small>}</div>
+                </div>
             </section>
             {notice && <p className="notice" role="status">{notice}</p>}
         </main>
@@ -51,6 +58,8 @@ function App() {
     async function refresh() {
         const response = await fetch('/api/snack-counter/dashboard');
         if (response.ok) setDashboard(await response.json() as Dashboard);
+        const reportResponse = await fetch('/api/snack-counter/reports/monthly');
+        if (reportResponse.ok) setMonthlyReport(await reportResponse.json() as MonthlyReport);
     }
 
     async function reportContainer(event: FormEvent<HTMLFormElement>) {
