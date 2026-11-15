@@ -3,10 +3,11 @@ import type { FormEvent } from 'react';
 import './App.css';
 
 interface Office { id: string; name: string; currency: string; monthlyBudget: number; }
-interface Ticket { id: string; containerId: string; officeName: string; currency: string; status: string; reservedBudget: number; spentAmount?: number; }
+interface Ticket { id: string; containerId: string; officeName: string; currency: string; status: string; reservedBudget: number; spentAmount?: number; volunteerId?: string; }
 interface Dashboard { offices: Office[]; tickets: Ticket[]; }
 interface SnackSummary { name: string; quantity: number; spend: number; currency: string; }
 interface MonthlyReport { month: string; consolidatedNokTotal: number; topSnacks: SnackSummary[]; }
+interface Claim { referenceId: string; amount: number; currency: string; status: string; }
 
 function App() {
     const [dashboard, setDashboard] = useState<Dashboard>();
@@ -14,6 +15,11 @@ function App() {
     const [containerId, setContainerId] = useState(getQrContainerId);
     const [officeId, setOfficeId] = useState('oslo');
     const [volunteerId, setVolunteerId] = useState('volunteer-1');
+    const [proofAmount, setProofAmount] = useState('');
+    const [proofItems, setProofItems] = useState('Assorted snacks');
+    const [proofReceipt, setProofReceipt] = useState('receipt-demo.jpg');
+    const [proofPhoto, setProofPhoto] = useState('counter-demo.jpg');
+    const [claim, setClaim] = useState<Claim>();
     const [notice, setNotice] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const qrContainerId = getQrContainerId();
@@ -41,6 +47,14 @@ function App() {
                     <label>Your volunteer ID<input value={volunteerId} onChange={event => setVolunteerId(event.target.value)} /></label>
                     <div className="ticket-list">{dashboard?.tickets.filter(ticket => ticket.status === 'Open').slice(0, 3).map(ticket => <div className="ticket" key={ticket.id}><div><strong>{ticket.containerId}</strong><span>{ticket.officeName} · {ticket.reservedBudget} {ticket.currency}</span></div><button className="secondary" onClick={() => acknowledge(ticket.id)}>Acknowledge</button></div>)}</div>
                     {!dashboard?.tickets.some(ticket => ticket.status === 'Open') && <p className="muted">No open tickets right now.</p>}
+                    {dashboard?.tickets.filter(ticket => ticket.status === 'Acknowledged' && ticket.volunteerId === volunteerId).map(ticket => <form className="proof-form" key={ticket.id} onSubmit={event => submitProof(event, ticket.id)}>
+                        <strong>Proof for {ticket.containerId}</strong>
+                        <input type="number" min="0.01" step="0.01" placeholder={`Amount in ${ticket.currency}`} value={proofAmount} onChange={event => setProofAmount(event.target.value)} required />
+                        <input placeholder="Items, comma separated" value={proofItems} onChange={event => setProofItems(event.target.value)} required />
+                        <div className="proof-files"><input placeholder="Receipt reference" value={proofReceipt} onChange={event => setProofReceipt(event.target.value)} required /><input placeholder="Photo reference" value={proofPhoto} onChange={event => setProofPhoto(event.target.value)} required /></div>
+                        <button>Submit proof →</button>
+                    </form>)}
+                    {claim && <div className="claim"><span>Claim {claim.referenceId}</span><strong>{claim.amount.toLocaleString()} {claim.currency} · {claim.status}</strong></div>}
                 </section>
             </section>
             <section className="card table-card">
@@ -77,6 +91,21 @@ function App() {
         const response = await fetch(`/api/snack-counter/tickets/${ticketId}/acknowledge`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ volunteerId, reimbursementConsent: true }) });
         const result = await response.json() as { error?: string };
         setNotice(response.ok ? 'Ticket acknowledged. Submit proof after shopping.' : result.error ?? 'Unable to acknowledge ticket.');
+        await refresh();
+    }
+
+    async function submitProof(event: FormEvent<HTMLFormElement>, ticketId: string) {
+        event.preventDefault();
+        const response = await fetch(`/api/snack-counter/tickets/${ticketId}/proof`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ volunteerId, amount: Number(proofAmount), items: proofItems.split(','), receiptFileName: proofReceipt, counterPhotoFileName: proofPhoto }) });
+        const result = await response.json() as { error?: string; id?: string };
+        if (response.ok) {
+            const claimResponse = await fetch(`/api/snack-counter/tickets/${ticketId}/claim`);
+            if (claimResponse.ok) setClaim(await claimResponse.json() as Claim);
+            setNotice('Proof submitted. Your simulated reimbursement claim is ready.');
+            setProofAmount('');
+        } else {
+            setNotice(result.error ?? 'Unable to submit proof.');
+        }
         await refresh();
     }
 
