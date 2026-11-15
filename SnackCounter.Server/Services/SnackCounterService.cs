@@ -1,9 +1,10 @@
 using System.Collections.Concurrent;
+using SnackCounter.Server.Application;
 using SnackCounter.Server.Models;
 
 namespace SnackCounter.Server.Services;
 
-public sealed class SnackCounterService
+public sealed class SnackCounterService : IReplenishmentService
 {
     private readonly ConcurrentDictionary<Guid, SnackTicket> _tickets = new();
     private readonly ConcurrentDictionary<string, int> _volunteerOpenTickets = new();
