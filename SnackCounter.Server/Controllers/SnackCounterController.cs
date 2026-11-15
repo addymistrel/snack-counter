@@ -40,7 +40,11 @@ public sealed class SnackCounterController(IReplenishmentService service) : Cont
     public IActionResult SubmitProof(Guid ticketId, ProofRequest request)
     {
         var result = service.SubmitProof(ticketId, request);
-        return result.Error is null ? Ok(result.Ticket) : BadRequest(new { error = result.Error });
+        if (result.Error is null)
+            return Ok(result.Ticket);
+        return result.Error is "Only the assigned volunteer can submit proof for an acknowledged ticket."
+            ? Conflict(new { error = result.Error })
+            : BadRequest(new { error = result.Error });
     }
 
     [HttpGet("reports/monthly")]

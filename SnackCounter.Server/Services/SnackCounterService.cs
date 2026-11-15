@@ -102,7 +102,11 @@ public sealed class SnackCounterService : IReplenishmentService
 
     public (SnackTicket? Ticket, string? Error) SubmitProof(Guid ticketId, ProofRequest request)
     {
-        if (request.Amount <= 0 || request.Items.Count == 0 ||
+        var items = request.Items
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => item.Trim())
+            .ToArray();
+        if (request.Amount <= 0 || items.Length == 0 ||
             string.IsNullOrWhiteSpace(request.ReceiptFileName) ||
             string.IsNullOrWhiteSpace(request.CounterPhotoFileName))
             return (null, "Amount, at least one item, receipt, and counter photo are required.");
@@ -118,7 +122,8 @@ public sealed class SnackCounterService : IReplenishmentService
             {
                 Status = TicketStatus.Submitted,
                 SpentAmount = request.Amount,
-                Items = request.Items.Where(item => !string.IsNullOrWhiteSpace(item)).Select(item => item.Trim()).ToArray()
+                Items = items,
+                ProofExceedsEstimate = request.Amount > ticket.ReservedBudget
             };
             _tickets[ticketId] = submitted;
             var budgetKey = GetBudgetKey(ticket.OfficeId, ticket.CreatedAt);
