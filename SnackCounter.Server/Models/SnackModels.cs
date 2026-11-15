@@ -69,3 +69,20 @@ public sealed record MonthlyReport(
     IReadOnlyList<SnackSummary> TopSnacks);
 
 public sealed record SnackSummary(string Name, int Quantity, decimal Spend, string Currency);
+
+public enum ClaimStatus
+{
+    Submitted,
+    Approved,
+    Paid
+}
+
+public sealed record ReimbursementClaim(
+    Guid Id,
+    Guid TicketId,
+    string ReferenceId,
+    string VolunteerId,
+    decimal Amount,
+    string Currency,
+    ClaimStatus Status,
+    DateTimeOffset CreatedAt);
