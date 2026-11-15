@@ -3,6 +3,10 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 
 builder.Services.AddControllers();
+builder.Services.AddSingleton<SnackCounter.Server.Services.SnackCounterService>();
+builder.Services.AddSingleton<SnackCounter.Server.Application.IReplenishmentService>(serviceProvider =>
+    serviceProvider.GetRequiredService<SnackCounter.Server.Services.SnackCounterService>());
+builder.Services.AddHealthChecks();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -24,6 +28,7 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHealthChecks("/health");
 
 app.MapFallbackToFile("/index.html");
 
