@@ -8,13 +8,16 @@ interface Dashboard { offices: Office[]; tickets: Ticket[]; }
 
 function App() {
     const [dashboard, setDashboard] = useState<Dashboard>();
-    const [containerId, setContainerId] = useState('');
+    const [containerId, setContainerId] = useState(getQrContainerId);
     const [officeId, setOfficeId] = useState('oslo');
     const [volunteerId, setVolunteerId] = useState('volunteer-1');
     const [notice, setNotice] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const qrContainerId = getQrContainerId();
 
-    useEffect(() => { void refresh(); }, []);
+    useEffect(() => {
+        void refresh();
+    }, []);
 
     return (
         <main>
@@ -24,8 +27,8 @@ function App() {
             </header>
             <section className="grid">
                 <form className="card report-card" onSubmit={reportContainer}>
-                    <div className="card-heading"><span className="step">01</span><div><h2>Report an empty</h2><p>Start a replenishment ticket in three quick confirmations.</p></div></div>
-                    <label>Container ID<input value={containerId} onChange={event => setContainerId(event.target.value)} placeholder="e.g. pantry-oslo-04" required /></label>
+                    <div className="card-heading"><span className="step">01</span><div><h2>{qrContainerId ? 'Confirm this empty' : 'Report an empty'}</h2><p>{qrContainerId ? `QR link for ${qrContainerId}. Confirm the details to continue.` : 'Start a replenishment ticket in three quick confirmations.'}</p></div></div>
+                    <label>Container ID<input data-testid="container-id" value={containerId} onChange={event => setContainerId(event.target.value)} placeholder="e.g. pantry-oslo-04" required /></label>
                     <label>Office<select value={officeId} onChange={event => setOfficeId(event.target.value)}>{dashboard?.offices.map(office => <option key={office.id} value={office.id}>{office.name} · {office.currency}</option>)}</select></label>
                     <div className="confirmations"><label><input type="checkbox" required /> Empty</label><label><input type="checkbox" required /> Location</label><label><input type="checkbox" required /> Snack type</label></div>
                     <button disabled={isSubmitting}>{isSubmitting ? 'Creating…' : 'Create ticket →'}</button>
@@ -66,6 +69,12 @@ function App() {
         const result = await response.json() as { error?: string };
         setNotice(response.ok ? 'Ticket acknowledged. Submit proof after shopping.' : result.error ?? 'Unable to acknowledge ticket.');
         await refresh();
+    }
+
+    function getQrContainerId() {
+        const match = window.location.pathname.match(/^\/r\/([^/]+)$/);
+        if (!match) return '';
+        return decodeURIComponent(match[1]);
     }
 }
 
