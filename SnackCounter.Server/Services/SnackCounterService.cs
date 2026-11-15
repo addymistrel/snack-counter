@@ -8,6 +8,8 @@ public sealed class SnackCounterService : IReplenishmentService
 {
     private readonly ConcurrentDictionary<Guid, SnackTicket> _tickets = new();
     private readonly ConcurrentDictionary<string, int> _volunteerOpenTickets = new();
+    private readonly Dictionary<string, decimal> _monthlyReserved = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, decimal> _monthlySpent = new(StringComparer.OrdinalIgnoreCase);
     private readonly IReadOnlyDictionary<string, Office> _offices = new Dictionary<string, Office>(StringComparer.OrdinalIgnoreCase)
     {
         ["oslo"] = new("oslo", "Oslo", "NOK", 6000m),
@@ -38,14 +40,14 @@ public sealed class SnackCounterService : IReplenishmentService
             if (existing is not null)
                 return (existing, "This container already has an active ticket.");
 
-            var monthStart = new DateTimeOffset(DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
-            var reserved = _tickets.Values
-                .Where(ticket => ticket.OfficeId == office.Id && ticket.CreatedAt >= monthStart && ticket.Status != TicketStatus.Closed)
-                .Sum(ticket => ticket.ReservedBudget);
             var estimatedCost = request.Quantity * request.UnitPrice;
-            if (reserved + estimatedCost > office.MonthlyBudget)
+            var budgetKey = GetBudgetKey(office.Id, DateTimeOffset.UtcNow);
+            var reserved = _monthlyReserved.GetValueOrDefault(budgetKey);
+            var spent = _monthlySpent.GetValueOrDefault(budgetKey);
+            if (spent + reserved + estimatedCost > office.MonthlyBudget)
                 return (null, $"The {office.Name} monthly budget has no room for another reservation.");
 
+            _monthlyReserved[budgetKey] = reserved + estimatedCost;
             var ticket = new SnackTicket(
                 Guid.NewGuid(),
                 request.ContainerId.Trim(),
@@ -118,6 +120,9 @@ public sealed class SnackCounterService : IReplenishmentService
                 Items = request.Items.Where(item => !string.IsNullOrWhiteSpace(item)).Select(item => item.Trim()).ToArray()
             };
             _tickets[ticketId] = submitted;
+            var budgetKey = GetBudgetKey(ticket.OfficeId, ticket.CreatedAt);
+            _monthlyReserved[budgetKey] = Math.Max(0, _monthlyReserved.GetValueOrDefault(budgetKey) - ticket.ReservedBudget);
+            _monthlySpent[budgetKey] = _monthlySpent.GetValueOrDefault(budgetKey) + request.Amount;
             _volunteerOpenTickets.AddOrUpdate(request.VolunteerId, 0, (_, value) => Math.Max(0, value - 1));
             return (submitted, null);
         }
@@ -131,13 +136,14 @@ public sealed class SnackCounterService : IReplenishmentService
         var summaries = _offices.Values.Select(office =>
         {
             var officeTickets = tickets.Where(ticket => ticket.OfficeId == office.Id).ToArray();
+            var budgetKey = GetBudgetKey(office.Id, monthStart);
             return new OfficeSummary(
                 office.Id,
                 office.Name,
                 office.Currency,
                 office.MonthlyBudget,
-                officeTickets.Sum(ticket => ticket.ReservedBudget),
-                officeTickets.Sum(ticket => ticket.SpentAmount ?? 0),
+                _monthlyReserved.GetValueOrDefault(budgetKey),
+                _monthlySpent.GetValueOrDefault(budgetKey),
                 officeTickets.Count(ticket => ticket.Status is TicketStatus.Open or TicketStatus.Acknowledged),
                 officeTickets.Count(ticket => ticket.Status == TicketStatus.Submitted || ticket.Status == TicketStatus.Closed));
         }).ToArray();
@@ -155,4 +161,7 @@ public sealed class SnackCounterService : IReplenishmentService
 
         return new MonthlyReport(month.ToString("yyyy-MM"), nok.Spent + (inr.Spent * exchangeRate), summaries, topSnacks);
     }
+
+    private static string GetBudgetKey(string officeId, DateTimeOffset date) =>
+        $"{officeId}:{date.Year:D4}-{date.Month:D2}";
 }
