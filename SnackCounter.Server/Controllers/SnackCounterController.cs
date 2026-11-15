@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
+using SnackCounter.Server.Application;
 using SnackCounter.Server.Models;
-using SnackCounter.Server.Services;
 
 namespace SnackCounter.Server.Controllers;
 
 [ApiController]
 [Route("api/snack-counter")]
-public sealed class SnackCounterController(SnackCounterService service) : ControllerBase
+public sealed class SnackCounterController(IReplenishmentService service) : ControllerBase
 {
     [HttpGet("dashboard")]
     public IActionResult Dashboard() => Ok(new { offices = service.Offices, tickets = service.GetTickets() });

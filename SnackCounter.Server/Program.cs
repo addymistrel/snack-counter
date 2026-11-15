@@ -4,6 +4,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddSingleton<SnackCounter.Server.Services.SnackCounterService>();
+builder.Services.AddSingleton<SnackCounter.Server.Application.IReplenishmentService>(serviceProvider =>
+    serviceProvider.GetRequiredService<SnackCounter.Server.Services.SnackCounterService>());
 builder.Services.AddHealthChecks();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
