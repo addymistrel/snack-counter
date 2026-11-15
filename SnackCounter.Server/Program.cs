@@ -12,7 +12,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 if (!string.IsNullOrWhiteSpace(connectionString))
 {
     builder.Services.AddDbContext<SnackCounterDbContext>(options =>
-        options.UseNpgsql(connectionString));
+        options.UseNpgsql(DatabaseConnectionString.Normalize(connectionString)));
 }
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("postgresql");

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.Extensions.Configuration;
 
 namespace SnackCounter.Server.Infrastructure.Database;
 
@@ -8,14 +9,25 @@ public sealed class SnackCounterDbContextFactory : IDesignTimeDbContextFactory<S
     public SnackCounterDbContext CreateDbContext(string[] args)
     {
         var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
-            ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
+            ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+            ?? LoadApplicationConnectionString();
         if (string.IsNullOrWhiteSpace(connectionString))
             throw new InvalidOperationException(
-                "Set DATABASE_URL or ConnectionStrings__DefaultConnection before running EF database commands.");
+                "Configure ConnectionStrings:DefaultConnection in appsettings or set DATABASE_URL before running EF database commands.");
 
         var options = new DbContextOptionsBuilder<SnackCounterDbContext>()
-            .UseNpgsql(connectionString)
+            .UseNpgsql(DatabaseConnectionString.Normalize(connectionString))
             .Options;
         return new SnackCounterDbContext(options);
+    }
+
+    private static string? LoadApplicationConnectionString()
+    {
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: true)
+            .AddJsonFile("appsettings.Development.json", optional: true)
+            .Build();
+        return configuration.GetConnectionString("DefaultConnection");
     }
 }
