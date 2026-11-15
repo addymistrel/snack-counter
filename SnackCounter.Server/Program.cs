@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using SnackCounter.Server.Infrastructure.Persistence;
+using SnackCounter.Server.Infrastructure.Database;
 
 var builder = WebApplication.CreateBuilder(args);
 

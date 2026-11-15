@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-namespace SnackCounter.Server.Infrastructure.Persistence;
+namespace SnackCounter.Server.Infrastructure.Database;
 
 public sealed class DatabaseHealthCheck(
     IServiceScopeFactory scopeFactory,
