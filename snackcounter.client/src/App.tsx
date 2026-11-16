@@ -1,119 +1,332 @@
-import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import {
+    getApiError,
+    getDashboard,
+    getMonthlyReport,
+    resetDemo,
+    type Claim,
+    type Dashboard,
+    type MonthlyReport,
+    type Volunteer
+} from './api/client';
+import { ReportPage } from './pages/ReportPage';
+import { VolunteerPage } from './pages/VolunteerPage';
+import { NotificationsHub } from './pages/NotificationsHub';
+import { AdminControlRoom } from './pages/AdminControlRoom';
+import { MonthlyReportPage } from './pages/MonthlyReportPage';
+import { WalkthroughModal } from './pages/WalkthroughModal';
 import './App.css';
-
-interface Office { id: string; name: string; currency: string; monthlyBudget: number; }
-interface Ticket { id: string; containerId: string; officeName: string; currency: string; status: string; reservedBudget: number; spentAmount?: number; volunteerId?: string; }
-interface Dashboard { offices: Office[]; tickets: Ticket[]; }
-interface SnackSummary { name: string; quantity: number; spend: number; currency: string; }
-interface MonthlyReport { month: string; consolidatedNokTotal: number; topSnacks: SnackSummary[]; }
-interface Claim { referenceId: string; amount: number; currency: string; status: string; }
 
 function App() {
     const [dashboard, setDashboard] = useState<Dashboard>();
     const [monthlyReport, setMonthlyReport] = useState<MonthlyReport>();
-    const [containerId, setContainerId] = useState(getQrContainerId);
-    const [officeId, setOfficeId] = useState('oslo');
-    const [volunteerId, setVolunteerId] = useState('volunteer-1');
-    const [proofAmount, setProofAmount] = useState('');
-    const [proofItems, setProofItems] = useState('Assorted snacks');
-    const [proofReceipt, setProofReceipt] = useState('receipt-demo.jpg');
-    const [proofPhoto, setProofPhoto] = useState('counter-demo.jpg');
-    const [claim, setClaim] = useState<Claim>();
-    const [notice, setNotice] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [currentVolunteerId, setCurrentVolunteerId] = useState<string>('');
+    const [activeTab, setActiveTab] = useState<'hub' | 'chat' | 'admin' | 'report'>('hub');
+    const [toastMessage, setToastMessage] = useState('');
+    const [error, setError] = useState('');
+    const [isWalkthroughOpen, setIsWalkthroughOpen] = useState(false);
+
     const qrContainerId = getQrContainerId();
 
+    const refresh = useCallback(async () => {
+        setError('');
+        try {
+            const [nextDashboard, nextReport] = await Promise.all([
+                getDashboard(),
+                getMonthlyReport()
+            ]);
+            setDashboard(nextDashboard);
+            setMonthlyReport(nextReport);
+
+            if (!nextDashboard.volunteers.some(v => v.id === currentVolunteerId) && nextDashboard.volunteers.length > 0) {
+                setCurrentVolunteerId(nextDashboard.volunteers[0].id);
+            }
+        } catch (requestError) {
+            setError(getApiError(requestError, 'Unable to load data from the server.'));
+        }
+    }, [currentVolunteerId]);
+
     useEffect(() => {
+        // Initial server synchronization belongs in the mount effect.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         void refresh();
-    }, []);
+    }, [refresh]);
+
+    async function handleCompleted(message: string, claim?: Claim) {
+        const fullNotice = claim
+            ? `${message} Claim ${claim.referenceId} is ${claim.status}.`
+            : message;
+        setToastMessage(fullNotice);
+        await refresh();
+
+        // Auto-hide toast after 5s
+        setTimeout(() => setToastMessage(''), 5000);
+    }
+
+    async function handleResetDemo() {
+        try {
+            await resetDemo();
+            setToastMessage('Demo state has been reset to clean initial seed data.');
+            await refresh();
+            setTimeout(() => setToastMessage(''), 4000);
+        } catch (err) {
+            setError(getApiError(err, 'Failed to reset demo.'));
+        }
+    }
+
+    if (!dashboard) {
+        return (
+            <main style={{ padding: '60px 20px', textAlign: 'center' }}>
+                <p style={{ fontSize: '15px', color: 'var(--text-muted)' }}>
+                    {error || 'Connecting to Snack Counter Automation service…'}
+                </p>
+            </main>
+        );
+    }
+
+    // Active SSO persona
+    const currentVolunteer: Volunteer = dashboard.volunteers.find(v => v.id === currentVolunteerId)
+        ?? dashboard.volunteers[0];
 
     return (
         <main>
-            <header className="hero">
-                <div><p className="eyebrow">Snack Counter / operations</p><h1>Keep the good stuff<br /><span>within reach.</span></h1><p className="lede">One clear handoff from empty container to reimbursed volunteer.</p></div>
-                <div className="pulse"><strong>{dashboard?.tickets.length ?? 0}</strong><span>tickets this month</span></div>
-            </header>
-            <section className="grid">
-                <form className="card report-card" onSubmit={reportContainer}>
-                    <div className="card-heading"><span className="step">01</span><div><h2>{qrContainerId ? 'Confirm this empty' : 'Report an empty'}</h2><p>{qrContainerId ? `QR link for ${qrContainerId}. Confirm the details to continue.` : 'Start a replenishment ticket in three quick confirmations.'}</p></div></div>
-                    <label>Container ID<input data-testid="container-id" value={containerId} onChange={event => setContainerId(event.target.value)} placeholder="e.g. pantry-oslo-04" required /></label>
-                    <label>Office<select value={officeId} onChange={event => setOfficeId(event.target.value)}>{dashboard?.offices.map(office => <option key={office.id} value={office.id}>{office.name} · {office.currency}</option>)}</select></label>
-                    <div className="confirmations"><label><input type="checkbox" required /> Empty</label><label><input type="checkbox" required /> Location</label><label><input type="checkbox" required /> Snack type</label></div>
-                    <button disabled={isSubmitting}>{isSubmitting ? 'Creating…' : 'Create ticket →'}</button>
-                </form>
-                <section className="card insight-card">
-                    <div className="card-heading"><span className="step">02</span><div><h2>Volunteer inbox</h2><p>Claim the next open ticket before the deadline.</p></div></div>
-                    <label>Your volunteer ID<input value={volunteerId} onChange={event => setVolunteerId(event.target.value)} /></label>
-                    <div className="ticket-list">{dashboard?.tickets.filter(ticket => ticket.status === 'Open').slice(0, 3).map(ticket => <div className="ticket" key={ticket.id}><div><strong>{ticket.containerId}</strong><span>{ticket.officeName} · {ticket.reservedBudget} {ticket.currency}</span></div><button className="secondary" onClick={() => acknowledge(ticket.id)}>Acknowledge</button></div>)}</div>
-                    {!dashboard?.tickets.some(ticket => ticket.status === 'Open') && <p className="muted">No open tickets right now.</p>}
-                    {dashboard?.tickets.filter(ticket => ticket.status === 'Acknowledged' && ticket.volunteerId === volunteerId).map(ticket => <form className="proof-form" key={ticket.id} onSubmit={event => submitProof(event, ticket.id)}>
-                        <strong>Proof for {ticket.containerId}</strong>
-                        <input type="number" min="0.01" step="0.01" placeholder={`Amount in ${ticket.currency}`} value={proofAmount} onChange={event => setProofAmount(event.target.value)} required />
-                        <input placeholder="Items, comma separated" value={proofItems} onChange={event => setProofItems(event.target.value)} required />
-                        <div className="proof-files"><input placeholder="Receipt reference" value={proofReceipt} onChange={event => setProofReceipt(event.target.value)} required /><input placeholder="Photo reference" value={proofPhoto} onChange={event => setProofPhoto(event.target.value)} required /></div>
-                        <button>Submit proof →</button>
-                    </form>)}
-                    {claim && <div className="claim"><span>Claim {claim.referenceId}</span><strong>{claim.amount.toLocaleString()} {claim.currency} · {claim.status}</strong></div>}
-                </section>
-            </section>
-            <section className="card table-card">
-                <div className="card-heading"><span className="step">03</span><div><h2>Monthly control room</h2><p>Native currency budgets with a single NOK view for management.</p></div><button className="secondary" onClick={() => void refresh()}>Refresh</button></div>
-                <div className="office-grid">{dashboard?.offices.map(office => { const tickets = dashboard.tickets.filter(ticket => ticket.officeName === office.name); const spent = tickets.reduce((sum, ticket) => sum + (ticket.spentAmount ?? 0), 0); return <div className="office" key={office.id}><span>{office.name}</span><strong>{spent.toLocaleString()} {office.currency}</strong><small>{tickets.length} tickets · budget {office.monthlyBudget.toLocaleString()}</small><div className="bar"><i style={{ width: `${Math.min(100, (spent / office.monthlyBudget) * 100)}%` }} /></div></div>; })}</div>
-                <div className="report-summary">
-                    <div><span>Consolidated NOK</span><strong>{monthlyReport?.consolidatedNokTotal.toLocaleString() ?? '0'} NOK</strong><small>{monthlyReport?.month ?? 'Current month'} · sample rate</small></div>
-                    <div><span>Top snacks</span>{monthlyReport?.topSnacks.length ? monthlyReport.topSnacks.map(snack => <small key={`${snack.name}-${snack.currency}`}>{snack.name} · {snack.quantity} · {snack.spend.toLocaleString()} {snack.currency}</small>) : <small>No purchases yet.</small>}</div>
+            {/* TOP SSO & DEMO CONTROL BAR */}
+            <header className="top-nav">
+                <div className="sso-badge">
+                    <div className="sso-avatar">
+                        {currentVolunteer.name.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="sso-details">
+                        <span className="sso-name">{currentVolunteer.name} (SSO)</span>
+                        <span className="sso-sub">
+                            {currentVolunteer.currentOfficeId.toUpperCase()} Office · {currentVolunteer.payrollCurrency} Payroll · {currentVolunteer.unpaidClaimsCount} Unpaid Claims
+                        </span>
+                    </div>
+                    <div className="sso-selector">
+                        <select
+                            value={currentVolunteer.id}
+                            onChange={e => setCurrentVolunteerId(e.target.value)}
+                            title="Switch Company SSO Persona"
+                        >
+                            {dashboard.volunteers.map(volunteer => (
+                                <option key={volunteer.id} value={volunteer.id}>
+                                    {volunteer.name} ({volunteer.currentOfficeId.toUpperCase()} · {volunteer.unpaidClaimsCount} unpaid claims)
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
-            </section>
-            {notice && <p className="notice" role="status">{notice}</p>}
+
+                <div className="demo-controls">
+                    <button
+                        type="button"
+                        className="btn-sm btn-secondary"
+                        onClick={() => setIsWalkthroughOpen(true)}
+                        style={{ background: '#fff2eb', color: 'var(--primary)', borderColor: 'var(--primary)' }}
+                    >
+                        📋 10-Min Walkthrough Script
+                    </button>
+
+                    <button
+                        type="button"
+                        className="btn-sm btn-secondary"
+                        onClick={() => void handleResetDemo()}
+                    >
+                        ↺ Reset Demo
+                    </button>
+
+                    <span className={`badge ${dashboard.isHRDown ? 'badge-offline' : 'badge-online'}`}>
+                        {dashboard.isHRDown ? 'HR: OFFLINE' : 'HR: ONLINE'}
+                    </span>
+                </div>
+            </header>
+
+            {/* HERO TITLE & STATS */}
+            <div className="hero">
+                <div>
+                    <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--primary)' }}>
+                        Snack Counter Automation · Oslo & Bengaluru
+                    </span>
+                    <h1>
+                        From empty box<br />
+                        <span>to reimbursed volunteer.</span>
+                    </h1>
+                    <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)', maxWidth: '540px' }}>
+                        Automating goodwill into fair rotations, immutable budget reservations, and automated payroll claims across Oslo and Bengaluru.
+                    </p>
+                </div>
+
+                <div className="hero-stats">
+                    <div className="stat-item">
+                        <div className="stat-val">{dashboard.tickets.length}</div>
+                        <div className="stat-label">Total Tickets</div>
+                    </div>
+                    <div className="stat-item">
+                        <div className="stat-val">{dashboard.tickets.filter(t => t.status === 'Open').length}</div>
+                        <div className="stat-label">Open for Claim</div>
+                    </div>
+                    <div className="stat-item">
+                        <div className="stat-val">{dashboard.claims.length}</div>
+                        <div className="stat-label">HR Claims</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* 11-STEP INTERACTIVE WORKFLOW STEPPER */}
+            <div className="stepper-container">
+                <div className="stepper-header">Complete 11-Step Workflow & Side Path</div>
+                <div className="stepper">
+                    <div className={`step-pill ${activeTab === 'hub' ? 'active' : ''}`} onClick={() => setActiveTab('hub')}>
+                        1. QR/Manual Report
+                    </div>
+                    <span className="step-arrow">→</span>
+                    <div className={`step-pill ${activeTab === 'hub' ? 'active' : ''}`} onClick={() => setActiveTab('hub')}>
+                        2. Ticket Created
+                    </div>
+                    <span className="step-arrow">→</span>
+                    <div className={`step-pill ${activeTab === 'admin' ? 'active' : ''}`} onClick={() => setActiveTab('admin')}>
+                        3. Budget Gate
+                    </div>
+                    <span className="step-arrow">→</span>
+                    <div className={`step-pill ${activeTab === 'chat' ? 'active' : ''}`} onClick={() => setActiveTab('chat')}>
+                        4. Chat & Email Notify
+                    </div>
+                    <span className="step-arrow">→</span>
+                    <div className={`step-pill ${activeTab === 'hub' ? 'active' : ''}`} onClick={() => setActiveTab('hub')}>
+                        5. Volunteer Accept & Debt
+                    </div>
+                    <span className="step-arrow">→</span>
+                    <div className={`step-pill ${activeTab === 'hub' ? 'active' : ''}`} onClick={() => setActiveTab('hub')}>
+                        6. 4h Auto-Pick
+                    </div>
+                    <span className="step-arrow">→</span>
+                    <div className={`step-pill ${activeTab === 'hub' ? 'active' : ''}`} onClick={() => setActiveTab('hub')}>
+                        7. 48h Refill & Transfers
+                    </div>
+                    <span className="step-arrow">→</span>
+                    <div className={`step-pill ${activeTab === 'hub' ? 'active' : ''}`} onClick={() => setActiveTab('hub')}>
+                        8. Proof Upload
+                    </div>
+                    <span className="step-arrow">→</span>
+                    <div className={`step-pill ${activeTab === 'admin' ? 'active' : ''}`} onClick={() => setActiveTab('admin')}>
+                        9. HR Claim
+                    </div>
+                    <span className="step-arrow">→</span>
+                    <div className={`step-pill ${activeTab === 'admin' ? 'active' : ''}`} onClick={() => setActiveTab('admin')}>
+                        10. Nightly Batch Sync
+                    </div>
+                    <span className="step-arrow">→</span>
+                    <div className={`step-pill ${activeTab === 'report' ? 'active' : ''}`} onClick={() => setActiveTab('report')}>
+                        11. Management Report
+                    </div>
+                    <span className="step-arrow">|</span>
+                    <div className={`step-pill ${activeTab === 'hub' ? 'active' : ''}`} onClick={() => setActiveTab('hub')} style={{ borderColor: '#e65100' }}>
+                        ★ Side Path: Already Refilled
+                    </div>
+                </div>
+            </div>
+
+            {/* TAB NAVIGATION */}
+            <nav className="nav-tabs">
+                <button
+                    type="button"
+                    className={`nav-tab ${activeTab === 'hub' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('hub')}
+                >
+                    🏢 Workflow & Refill Hub
+                </button>
+                <button
+                    type="button"
+                    className={`nav-tab ${activeTab === 'chat' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('chat')}
+                >
+                    💬 Simulated Chat & Emails ({dashboard.notifications.length})
+                </button>
+                <button
+                    type="button"
+                    className={`nav-tab ${activeTab === 'admin' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('admin')}
+                >
+                    ⚙️ HR & Admin Control Room ({dashboard.claims.length})
+                </button>
+                <button
+                    type="button"
+                    className={`nav-tab ${activeTab === 'report' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('report')}
+                >
+                    📊 Monthly Management Report
+                </button>
+            </nav>
+
+            {error && <p style={{ color: 'var(--danger)', fontSize: '13px', padding: '10px 14px', background: '#fde8e8', borderRadius: '8px' }}>{error}</p>}
+
+            {/* TAB CONTENT */}
+            {activeTab === 'hub' && (
+                <div className="grid-2">
+                    <ReportPage
+                        offices={dashboard.offices}
+                        containers={dashboard.containers}
+                        tickets={dashboard.tickets}
+                        currentVolunteer={currentVolunteer}
+                        initialContainerId={qrContainerId}
+                        onCompleted={handleCompleted}
+                    />
+                    <VolunteerPage
+                        tickets={dashboard.tickets}
+                        volunteers={dashboard.volunteers}
+                        currentVolunteer={currentVolunteer}
+                        onCompleted={handleCompleted}
+                    />
+                </div>
+            )}
+
+            {activeTab === 'chat' && (
+                <NotificationsHub
+                    notifications={dashboard.notifications}
+                    onSelectAction={() => {
+                        setActiveTab('hub');
+                    }}
+                />
+            )}
+
+            {activeTab === 'admin' && (
+                <AdminControlRoom
+                    tickets={dashboard.tickets}
+                    claims={dashboard.claims}
+                    offices={dashboard.offices}
+                    isHRDown={dashboard.isHRDown}
+                    onCompleted={handleCompleted}
+                />
+            )}
+
+            {activeTab === 'report' && (
+                <MonthlyReportPage
+                    dashboard={dashboard}
+                    report={monthlyReport}
+                    onRefresh={refresh}
+                />
+            )}
+
+            {/* FLOATING TOAST NOTIFICATION */}
+            {toastMessage && (
+                <div className="toast" role="status">
+                    ✓ {toastMessage}
+                </div>
+            )}
+
+            {/* WALKTHROUGH SCRIPT MODAL */}
+            <WalkthroughModal
+                isOpen={isWalkthroughOpen}
+                onClose={() => setIsWalkthroughOpen(false)}
+                onSelectStep={tab => setActiveTab(tab)}
+            />
         </main>
     );
+}
 
-    async function refresh() {
-        const response = await fetch('/api/v1/snack-counter/dashboard');
-        if (response.ok) setDashboard(await response.json() as Dashboard);
-        const reportResponse = await fetch('/api/v1/snack-counter/reports/monthly');
-        if (reportResponse.ok) setMonthlyReport(await reportResponse.json() as MonthlyReport);
-    }
-
-    async function reportContainer(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
-        setIsSubmitting(true);
-        const response = await fetch('/api/v1/snack-counter/containers/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ containerId, officeId, containerEmpty: true, locationConfirmed: true, snackTypeConfirmed: true }) });
-        const result = await response.json() as { error?: string };
-        setNotice(response.ok ? 'Ticket created. Volunteers have been notified.' : result.error ?? 'Unable to create ticket.');
-        if (response.ok) setContainerId('');
-        await refresh();
-        setIsSubmitting(false);
-    }
-
-    async function acknowledge(ticketId: string) {
-        const response = await fetch(`/api/v1/snack-counter/tickets/${ticketId}/acknowledge`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ volunteerId, reimbursementConsent: true }) });
-        const result = await response.json() as { error?: string };
-        setNotice(response.ok ? 'Ticket acknowledged. Submit proof after shopping.' : result.error ?? 'Unable to acknowledge ticket.');
-        await refresh();
-    }
-
-    async function submitProof(event: FormEvent<HTMLFormElement>, ticketId: string) {
-        event.preventDefault();
-        const response = await fetch(`/api/v1/snack-counter/tickets/${ticketId}/proof`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ volunteerId, amount: Number(proofAmount), items: proofItems.split(','), receiptFileName: proofReceipt, counterPhotoFileName: proofPhoto }) });
-        const result = await response.json() as { error?: string; id?: string };
-        if (response.ok) {
-            const claimResponse = await fetch(`/api/v1/snack-counter/tickets/${ticketId}/claim`);
-            if (claimResponse.ok) setClaim(await claimResponse.json() as Claim);
-            setNotice('Proof submitted. Your simulated reimbursement claim is ready.');
-            setProofAmount('');
-        } else {
-            setNotice(result.error ?? 'Unable to submit proof.');
-        }
-        await refresh();
-    }
-
-    function getQrContainerId() {
-        const match = window.location.pathname.match(/^\/r\/([^/]+)$/);
-        if (!match) return '';
-        return decodeURIComponent(match[1]);
-    }
+function getQrContainerId() {
+    const match = window.location.pathname.match(/^\/r\/([^/]+)$/);
+    return match ? decodeURIComponent(match[1]) : '';
 }
 
 export default App;

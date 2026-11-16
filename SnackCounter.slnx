@@ -1,6 +1,5 @@
 <Solution>
-  <Folder Name="/SnackCounter.Server/" />
-  <Folder Name="/SnackCounter.Server/Tests/">
+  <Folder Name="/Tests/">
     <Project Path="SnackCounter.Server/Tests/SnackCounter.Server.Tests/SnackCounter.Server.Tests.csproj" />
   </Folder>
   <Project Path="snackcounter.client/snackcounter.client.esproj">
